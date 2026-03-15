@@ -17,7 +17,7 @@ import java.util.Map;
 public class ClipboardController {
     private final ClipboardService clipboardService;
 
-    @Value("${app.api.key.default-insecure-key}")
+    @Value("${app.api.key}")
     private String apiKey;
 
     @Autowired
@@ -31,7 +31,7 @@ public class ClipboardController {
      * Request body: {"content": "your text here"}
      * Headers: Authorization: Bearer YOUR_API_KEY
      */
-     *
+     
     @PostMapping("/copy")
     public ResponseEntity<ClipboardItem> copyToClipboard(
         @RequestHeader(value = "Authorization", required = false) String authHeader,

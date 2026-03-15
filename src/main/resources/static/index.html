@@ -43,6 +43,24 @@
             font-size: 14px;
         }
         
+        textarea {
+            width: 100%;
+            min-height: 120px;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 16px;
+            font-family: inherit;
+            resize: vertical;
+            margin-bottom: 15px;
+            transition: border-color 0.3s;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
         button {
             width: 100%;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -72,30 +90,8 @@
             transform: none;
         }
         
-        #preview {
-            margin-top: 25px;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 12px;
-            min-height: 80px;
-            word-wrap: break-word;
-            font-family: 'Courier New', monospace;
-            font-size: 14px;
-            color: #333;
-            max-height: 200px;
-            overflow-y: auto;
-            display: none;
-        }
-        
-        #preview.show {
-            display: block;
-        }
-        
-        .preview-label {
-            font-size: 12px;
-            color: #666;
-            margin-bottom: 8px;
-            font-weight: 600;
+        .secondary-btn {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
         }
         
         #message {
@@ -135,6 +131,12 @@
             border: 1px solid #f5c6cb;
         }
         
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
         .config {
             margin-top: 30px;
             padding: 20px;
@@ -154,9 +156,14 @@
             border-radius: 4px;
             font-family: 'Courier New', monospace;
         }
-        
-        .history-btn {
-            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .button-group button {
+            flex: 1;
         }
     </style>
 </head>
@@ -165,52 +172,59 @@
         <h1>📋 Clipboard Sync</h1>
         <p class="subtitle">Share clipboard between your devices</p>
         
-        <button onclick="pasteAndSend()" id="pasteBtn">
-            📋 Paste & Send to Computer
+        <textarea id="clipboardText" placeholder="Paste or type text here..."></textarea>
+        
+        <button onclick="sendToComputer()" id="sendBtn">
+            📤 Send to Computer
         </button>
         
-        <button onclick="getFromPC()" id="getBtn">
-            📥 Get from Computer
-        </button>
+        <div class="button-group">
+            <button onclick="getFromComputer()" id="getBtn" class="secondary-btn">
+                📥 Get Latest
+            </button>
+            
+            <button onclick="showHistory()" id="historyBtn" class="secondary-btn">
+                📜 History
+            </button>
+        </div>
         
-        <button onclick="showHistory()" id="historyBtn" class="history-btn">
-            📜 View History
-        </button>
-        
-        <div id="preview"></div>
         <div id="message"></div>
         
         <div class="config">
-            <strong>⚙️ Configuration:</strong><br>
-            Edit the <code>API_KEY</code> in this file to match your server's API key from <code>application.properties</code>
+            <strong>⚙️ Setup:</strong><br>
+            1. Update <code>API_KEY</code> in this file<br>
+            2. Match it with <code>application.properties</code>
         </div>
     </div>
 
     <script>
         // ⚠️ CHANGE THIS to match your application.properties app.api.key
-        const API_KEY = 'change-this-to-something-secure';
+        const API_KEY = '3397d4fef73306c1d06a03944d9f773305b03fbf56c0d334464cde2e47ce18eb';
         
-        // When deployed to cloud, change this to your Render.com URL
+        // Automatically detects if running locally or on cloud
         const SERVER_URL = window.location.origin + '/api';
         
-        async function pasteAndSend() {
-            const btn = document.getElementById('pasteBtn');
+        // Check if Clipboard API is available
+        const hasClipboardAPI = navigator.clipboard && window.isSecureContext;
+        
+        if (!hasClipboardAPI) {
+            showMessage('ℹ️ Using manual mode (clipboard API not available over HTTP)', 'info');
+        }
+        
+        async function sendToComputer() {
+            const btn = document.getElementById('sendBtn');
+            const textarea = document.getElementById('clipboardText');
+            
             btn.disabled = true;
-            btn.textContent = '⏳ Reading clipboard...';
+            btn.textContent = '⏳ Sending...';
             
             try {
-                // Read from phone/computer clipboard
-                const text = await navigator.clipboard.readText();
+                const text = textarea.value;
                 
                 if (!text || !text.trim()) {
-                    showMessage('Clipboard is empty!', 'error');
+                    showMessage('Please enter some text!', 'error');
                     return;
                 }
-                
-                // Show preview
-                showPreview(text);
-                
-                btn.textContent = '⏳ Sending...';
                 
                 // Send to server
                 const response = await fetch(`${SERVER_URL}/copy`, {
@@ -225,6 +239,15 @@
                 if (response.ok) {
                     const data = await response.json();
                     showMessage(`✅ Sent to computer! (ID: ${data.id})`, 'success');
+                    
+                    // Try to copy to clipboard if available
+                    if (hasClipboardAPI) {
+                        try {
+                            await navigator.clipboard.writeText(text);
+                        } catch (e) {
+                            // Ignore - clipboard write might fail
+                        }
+                    }
                 } else if (response.status === 401) {
                     showMessage('❌ Invalid API key! Check configuration.', 'error');
                 } else {
@@ -236,14 +259,16 @@
                 showMessage('❌ Error: ' + error.message, 'error');
             } finally {
                 btn.disabled = false;
-                btn.textContent = '📋 Paste & Send to Computer';
+                btn.textContent = '📤 Send to Computer';
             }
         }
         
-        async function getFromPC() {
+        async function getFromComputer() {
             const btn = document.getElementById('getBtn');
+            const textarea = document.getElementById('clipboardText');
+            
             btn.disabled = true;
-            btn.textContent = '⏳ Fetching...';
+            btn.textContent = '⏳ Loading...';
             
             try {
                 const response = await fetch(`${SERVER_URL}/latest`, {
@@ -253,7 +278,7 @@
                 });
                 
                 if (response.status === 204) {
-                    showMessage('ℹ️ No clipboard items on server yet', 'error');
+                    showMessage('ℹ️ No clipboard items on server yet', 'info');
                     return;
                 }
                 
@@ -269,27 +294,36 @@
                 
                 const data = await response.json();
                 
-                // Copy to clipboard
-                await navigator.clipboard.writeText(data.content);
+                // Show in textarea
+                textarea.value = data.content;
                 
-                // Show preview
-                showPreview(data.content);
-                
-                showMessage(`✅ Copied from computer! (ID: ${data.id})`, 'success');
+                // Try to copy to clipboard if available
+                if (hasClipboardAPI) {
+                    try {
+                        await navigator.clipboard.writeText(data.content);
+                        showMessage(`✅ Copied from computer! (ID: ${data.id})`, 'success');
+                    } catch (e) {
+                        showMessage(`✅ Loaded from computer! (ID: ${data.id}) - Long press to copy`, 'success');
+                    }
+                } else {
+                    showMessage(`✅ Loaded from computer! (ID: ${data.id}) - Long press to copy`, 'success');
+                }
                 
             } catch (error) {
                 console.error('Error:', error);
                 showMessage('❌ Error: ' + error.message, 'error');
             } finally {
                 btn.disabled = false;
-                btn.textContent = '📥 Get from Computer';
+                btn.textContent = '📥 Get Latest';
             }
         }
         
         async function showHistory() {
             const btn = document.getElementById('historyBtn');
+            const textarea = document.getElementById('clipboardText');
+            
             btn.disabled = true;
-            btn.textContent = '⏳ Loading history...';
+            btn.textContent = '⏳ Loading...';
             
             try {
                 const response = await fetch(`${SERVER_URL}/history`, {
@@ -311,16 +345,16 @@
                 const items = await response.json();
                 
                 if (items.length === 0) {
-                    showMessage('ℹ️ No clipboard history yet', 'error');
+                    showMessage('ℹ️ No clipboard history yet', 'info');
                     return;
                 }
                 
                 // Format history for display
                 const historyText = items.map((item, index) => 
-                    `[${index + 1}] ${new Date(item.timestamp).toLocaleString()}\n${item.content.substring(0, 100)}${item.content.length > 100 ? '...' : ''}`
-                ).join('\n\n---\n\n');
+                    `[${index + 1}] ${new Date(item.timestamp).toLocaleString()}\n${item.content}`
+                ).join('\n\n' + '='.repeat(50) + '\n\n');
                 
-                showPreview(historyText);
+                textarea.value = historyText;
                 showMessage(`✅ Showing ${items.length} clipboard items`, 'success');
                 
             } catch (error) {
@@ -328,15 +362,8 @@
                 showMessage('❌ Error: ' + error.message, 'error');
             } finally {
                 btn.disabled = false;
-                btn.textContent = '📜 View History';
+                btn.textContent = '📜 History';
             }
-        }
-        
-        function showPreview(text) {
-            const preview = document.getElementById('preview');
-            const truncated = text.length > 1000 ? text.substring(0, 1000) + '...' : text;
-            preview.innerHTML = `<div class="preview-label">Content:</div>${escapeHtml(truncated)}`;
-            preview.classList.add('show');
         }
         
         function showMessage(text, type) {
@@ -347,17 +374,6 @@
             setTimeout(() => {
                 messageDiv.classList.remove('show');
             }, 5000);
-        }
-        
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-        
-        // Check if Clipboard API is supported
-        if (!navigator.clipboard) {
-            showMessage('⚠️ Clipboard API not supported. Use HTTPS or localhost.', 'error');
         }
         
         // Test server connection on load

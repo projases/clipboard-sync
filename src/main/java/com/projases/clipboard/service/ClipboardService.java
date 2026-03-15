@@ -21,7 +21,7 @@ public class ClipboardService {
      *   Save content to the database and update the system clipboard
      *   */
 
-    public ClipboardItem saveClipboardContent(String content) {
+    public ClipboardItem saveToClipboard(String content) {
         ClipboardItem item = new ClipboardItem(content);
         ClipboardItem savedItem = repository.save(item);
 
@@ -52,35 +52,53 @@ public class ClipboardService {
      *   */
     private void updateSystemClipboard(String content) {
         try {
-            // Check if xclip is available
-            Process checkBuilder = new ProcessBuilder("which", "xclip");
-            Process checkProcess = checkBuilder.start();
-            int checkCode = checkProcess.waitFor();
-
-            if (checkCode != 0) {
-                System.err.println("xclip is not installed. Please install xclip to enable clipboard functionality.");
+            // Try wl-copy first (Wayland)
+            ProcessBuilder checkWlCopy = new ProcessBuilder("which", "wl-copy");
+            Process checkWl = checkWlCopy.start();
+            int wlExists = checkWl.waitFor();
+        
+            if (wlExists == 0) {
+                // Use wl-copy (Wayland)
+                ProcessBuilder processBuilder = new ProcessBuilder("wl-copy");
+                Process process = processBuilder.start();
+                process.getOutputStream().write(content.getBytes());
+                process.getOutputStream().close();
+                int exitCode = process.waitFor();
+            
+                if (exitCode == 0) {
+                    System.out.println("📋 Updated system clipboard (wl-copy)");
+                } else {
+                    System.err.println("⚠️  wl-copy exited with code: " + exitCode);
+                }
                 return;
             }
-
-            // Use xclip to update clipboard
-            ProcessBuilder processBuilder = new ProcessBuilder("xclip", "-selection", "clipboard");
-            Process process = processBuilder.start();
-
-            // Write content to xclip's stdin
-            process.getOutputStream().write(content.getBytes());
-            process.getOutputStream().close();
-
-            // Wait for the process to complete
-            int exitCode = process.waitFor();
-            if (exitCode == 0) {
-                System.out.println("System clipboard updated successfully.");
-            } else {
-                System.err.println("⚠️Failed to update system clipboard. Exit code: " + exitCode);
+        
+            // Fallback to xclip (X11)
+            ProcessBuilder checkXclip = new ProcessBuilder("which", "xclip");
+            Process checkX = checkXclip.start();
+            int xExists = checkX.waitFor();
+        
+            if (xExists == 0) {
+                ProcessBuilder processBuilder = new ProcessBuilder(
+                    "xclip", "-selection", "clipboard"
+                );
+                Process process = processBuilder.start();
+                process.getOutputStream().write(content.getBytes());
+                process.getOutputStream().close();
+                int exitCode = process.waitFor();
+            
+                if (exitCode == 0) {
+                    System.out.println("📋 Updated system clipboard (xclip)");
+                } else {
+                    System.err.println("⚠️  xclip exited with code: " + exitCode);
+                }
+                return;
             }
-                
+        
+            System.err.println("⚠️  No clipboard tool found - install wl-clipboard or xclip");
+        
         } catch (IOException | InterruptedException e) {
-            System.err.println("Error updating system clipboard: " + e.getMessage());
-            // Don't throw - clipboard update is optional
+            System.err.println("❌ Failed to update system clipboard: " + e.getMessage());
         }
-
+    }
 }
