@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clipboard Sync</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 500px;
+            width: 100%;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        button {
+            width: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 18px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        #preview {
+            margin-top: 25px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            min-height: 80px;
+            word-wrap: break-word;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            color: #333;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
+        
+        #preview.show {
+            display: block;
+        }
+        
+        .preview-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        
+        #message {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 12px;
+            display: none;
+            text-align: center;
+            font-weight: 500;
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        #message.show {
+            display: block;
+        }
+        
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .config {
+            margin-top: 30px;
+            padding: 20px;
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 12px;
+            font-size: 13px;
+        }
+        
+        .config strong {
+            color: #856404;
+        }
+        
+        .config code {
+            background: #fff;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .history-btn {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📋 Clipboard Sync</h1>
+        <p class="subtitle">Share clipboard between your devices</p>
+        
+        <button onclick="pasteAndSend()" id="pasteBtn">
+            📋 Paste & Send to Computer
+        </button>
+        
+        <button onclick="getFromPC()" id="getBtn">
+            📥 Get from Computer
+        </button>
+        
+        <button onclick="showHistory()" id="historyBtn" class="history-btn">
+            📜 View History
+        </button>
+        
+        <div id="preview"></div>
+        <div id="message"></div>
+        
+        <div class="config">
+            <strong>⚙️ Configuration:</strong><br>
+            Edit the <code>API_KEY</code> in this file to match your server's API key from <code>application.properties</code>
+        </div>
+    </div>
+
+    <script>
+        // ⚠️ CHANGE THIS to match your application.properties app.api.key
+        const API_KEY = 'change-this-to-something-secure';
+        
+        // When deployed to cloud, change this to your Render.com URL
+        const SERVER_URL = window.location.origin + '/api';
+        
+        async function pasteAndSend() {
+            const btn = document.getElementById('pasteBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Reading clipboard...';
+            
+            try {
+                // Read from phone/computer clipboard
+                const text = await navigator.clipboard.readText();
+                
+                if (!text || !text.trim()) {
+                    showMessage('Clipboard is empty!', 'error');
+                    return;
+                }
+                
+                // Show preview
+                showPreview(text);
+                
+                btn.textContent = '⏳ Sending...';
+                
+                // Send to server
+                const response = await fetch(`${SERVER_URL}/copy`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${API_KEY}`
+                    },
+                    body: JSON.stringify({ content: text })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    showMessage(`✅ Sent to computer! (ID: ${data.id})`, 'success');
+                } else if (response.status === 401) {
+                    showMessage('❌ Invalid API key! Check configuration.', 'error');
+                } else {
+                    showMessage(`❌ Failed to send (${response.status})`, 'error');
+                }
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showMessage('❌ Error: ' + error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '📋 Paste & Send to Computer';
+            }
+        }
+        
+        async function getFromPC() {
+            const btn = document.getElementById('getBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Fetching...';
+            
+            try {
+                const response = await fetch(`${SERVER_URL}/latest`, {
+                    headers: {
+                        'Authorization': `Bearer ${API_KEY}`
+                    }
+                });
+                
+                if (response.status === 204) {
+                    showMessage('ℹ️ No clipboard items on server yet', 'error');
+                    return;
+                }
+                
+                if (response.status === 401) {
+                    showMessage('❌ Invalid API key! Check configuration.', 'error');
+                    return;
+                }
+                
+                if (!response.ok) {
+                    showMessage(`❌ Failed to fetch (${response.status})`, 'error');
+                    return;
+                }
+                
+                const data = await response.json();
+                
+                // Copy to clipboard
+                await navigator.clipboard.writeText(data.content);
+                
+                // Show preview
+                showPreview(data.content);
+                
+                showMessage(`✅ Copied from computer! (ID: ${data.id})`, 'success');
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showMessage('❌ Error: ' + error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '📥 Get from Computer';
+            }
+        }
+        
+        async function showHistory() {
+            const btn = document.getElementById('historyBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Loading history...';
+            
+            try {
+                const response = await fetch(`${SERVER_URL}/history`, {
+                    headers: {
+                        'Authorization': `Bearer ${API_KEY}`
+                    }
+                });
+                
+                if (response.status === 401) {
+                    showMessage('❌ Invalid API key! Check configuration.', 'error');
+                    return;
+                }
+                
+                if (!response.ok) {
+                    showMessage(`❌ Failed to fetch history (${response.status})`, 'error');
+                    return;
+                }
+                
+                const items = await response.json();
+                
+                if (items.length === 0) {
+                    showMessage('ℹ️ No clipboard history yet', 'error');
+                    return;
+                }
+                
+                // Format history for display
+                const historyText = items.map((item, index) => 
+                    `[${index + 1}] ${new Date(item.timestamp).toLocaleString()}\n${item.content.substring(0, 100)}${item.content.length > 100 ? '...' : ''}`
+                ).join('\n\n---\n\n');
+                
+                showPreview(historyText);
+                showMessage(`✅ Showing ${items.length} clipboard items`, 'success');
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showMessage('❌ Error: ' + error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '📜 View History';
+            }
+        }
+        
+        function showPreview(text) {
+            const preview = document.getElementById('preview');
+            const truncated = text.length > 1000 ? text.substring(0, 1000) + '...' : text;
+            preview.innerHTML = `<div class="preview-label">Content:</div>${escapeHtml(truncated)}`;
+            preview.classList.add('show');
+        }
+        
+        function showMessage(text, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = text;
+            messageDiv.className = `${type} show`;
+            
+            setTimeout(() => {
+                messageDiv.classList.remove('show');
+            }, 5000);
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Check if Clipboard API is supported
+        if (!navigator.clipboard) {
+            showMessage('⚠️ Clipboard API not supported. Use HTTPS or localhost.', 'error');
+        }
+        
+        // Test server connection on load
+        fetch(`${SERVER_URL}/health`)
+            .then(response => response.json())
+            .then(data => {
+                console.log('✅ Server connected:', data);
+            })
+            .catch(error => {
+                console.error('❌ Server connection failed:', error);
+                showMessage('⚠️ Cannot connect to server. Is it running?', 'error');
+            });
+    </script>
+</body>
+</html>
