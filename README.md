@@ -1,6 +1,6 @@
 # 📋 Clipboard Sync
 
-Cross-device clipboard syncing with Spring Boot. Share clipboard content between your phone and computer over the internet.
+First iteration of a cross-device clipboard syncing with Spring Boot. Share clipboard content between your phone and computer over the internet.
 
 ## 🚀 Features
 

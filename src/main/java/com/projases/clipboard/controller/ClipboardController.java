@@ -43,7 +43,6 @@ public class ClipboardController {
             return ResponseEntity.status(401).build();
         }
 
-
         String content = payload.get("content");
         if (content == null || content.trim().isEmpty()) {
             System.out.println("Bad request - content is missing or empty");

@@ -12,7 +12,7 @@
         <relativePath/>
     </parent>
     
-    <groupId>com.yourname</groupId>
+    <groupId>com.projases</groupId>
     <artifactId>clipboard-sync</artifactId>
     <version>0.1.0</version>
     <name>clipboard-sync</name>

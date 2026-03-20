@@ -68,7 +68,7 @@ public class ClipboardService {
                 if (exitCode == 0) {
                     System.out.println("📋 Updated system clipboard (wl-copy)");
                 } else {
-                    System.err.println("⚠️  wl-copy exited with code: " + exitCode);
+                    System.err.println("⚠️ wl-copy exited with code: " + exitCode);
                 }
                 return;
             }

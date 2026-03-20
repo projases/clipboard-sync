@@ -12,7 +12,7 @@ public class ClipboardItem {
     private Long id;
 
     @Column(nullable = false, length = 10000)
-   private String content;
+    private String content;
 
     @Column(nullable = false)
     private LocalDateTime timestamp;
